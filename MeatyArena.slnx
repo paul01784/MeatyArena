@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Release" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="MeatyArena/MeatyArena.vcxproj" Id="6f67fcf2-fc8f-4f70-9fcf-d7fdc7a1eeb1" />
+</Solution>

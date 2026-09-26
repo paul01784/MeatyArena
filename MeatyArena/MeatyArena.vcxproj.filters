@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files"><UniqueIdentifier>{9C5A76A2-AC0C-4B66-A17C-92B6278AF086}</UniqueIdentifier></Filter>
+    <Filter Include="Header Files"><UniqueIdentifier>{5B478AA7-41ED-46D0-A317-54020B3D58F3}</UniqueIdentifier></Filter>
+    <Filter Include="Third Party"><UniqueIdentifier>{17A3B6DC-EBCF-4930-95F3-C8B3C2F0358E}</UniqueIdentifier></Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\App\Application.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Config\ConfigStore.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Core\Makcu\Makcu.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Core\Ferrum\Ferrum.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Core\InputDevice.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Core\Aim\ReadOnlyAim.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Core\Aim\FireportTracker.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Core\Logging\Log.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Memory\MemoryClient.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\SDK\RuntimeResolver.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\GameWorld\WorldSource.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Players\PlayerService.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Unity\ViewMatrix.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Unity\Camera.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Unity\Skeleton.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\UI\MainWindow.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\Fuser\PlayerDrawing.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\UI\Theme.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="third_party\imgui\imgui.cpp"><Filter>Third Party</Filter></ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_draw.cpp"><Filter>Third Party</Filter></ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_tables.cpp"><Filter>Third Party</Filter></ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_widgets.cpp"><Filter>Third Party</Filter></ClCompile>
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_dx9.cpp"><Filter>Third Party</Filter></ClCompile>
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_win32.cpp"><Filter>Third Party</Filter></ClCompile>
+    <ClCompile Include="third_party\imgui\misc\cpp\imgui_stdlib.cpp"><Filter>Third Party</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\App\AppConfig.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\App\Application.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\App\Version.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Config\ConfigStore.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Core\Makcu\Makcu.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Core\Ferrum\Ferrum.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Core\InputDevice.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Core\Aim\ReadOnlyAim.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Core\Aim\FireportTracker.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Core\Logging\Log.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Fuser\FuserController.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Fuser\PlayerDrawing.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Memory\MemoryClient.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\GameWorld\WorldSource.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Players\IPlayerSource.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Players\PlayerModel.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Players\PlayerService.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Players\TeamColours.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\SDK\Offsets.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\SDK\TargetProfile.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\SDK\RuntimeResolver.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Unity\Types.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Unity\Bones.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Unity\ViewMatrix.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Unity\Collections.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Unity\Camera.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\Unity\Skeleton.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\UI\MainWindow.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\UI\DisplayMonitors.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\UI\IconsFontAwesome7.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\UI\Theme.h"><Filter>Header Files</Filter></ClInclude>
+  </ItemGroup>
+</Project>

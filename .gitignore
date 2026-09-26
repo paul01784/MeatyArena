@@ -1,0 +1,31 @@
+# Visual Studio user state
+.vs/
+**/.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+
+# Build products
+/MeatyArena/bin/
+/MeatyArena/obj/
+*.pdb
+*.iobj
+*.ipdb
+*.ilk
+
+# Runtime-generated files
+**/configs/
+**/logs/
+**/mmap.txt
+**/mmap.txt.tmp
+**/imgui.ini
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

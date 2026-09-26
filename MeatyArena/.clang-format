@@ -1,0 +1,30 @@
+BasedOnStyle: Microsoft
+Language: Cpp
+Standard: c++20
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 180
+AccessModifierOffset: -4
+
+BreakBeforeBraces: Allman
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: None
+AllowShortLoopsOnASingleLine: false
+AllowShortNamespacesOnASingleLine: false
+
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBinaryOperators: None
+PenaltyBreakBeforeFirstCallParameter: 1000000
+
+NamespaceIndentation: All
+PointerAlignment: Left
+ReferenceAlignment: Left
+SortIncludes: Never
+SortUsingDeclarations: Never

@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
+    <Platform Condition="'$(Platform)'==''">x64</Platform>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{6F67FCF2-FC8F-4F70-9FCF-D7FDC7A1EEB1}</ProjectGuid>
+    <RootNamespace>MeatyArena</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)bin\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Configuration)\</IntDir>
+    <TargetName>MeatyArena</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;UNICODE;_UNICODE;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>src;third_party;third_party\imgui;third_party\memprocfs\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>third_party\memprocfs\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d9.lib;Advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;UNICODE;_UNICODE;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>src;third_party;third_party\imgui;third_party\memprocfs\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>third_party\memprocfs\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d9.lib;Advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\App\Application.cpp" />
+    <ClCompile Include="src\Config\ConfigStore.cpp" />
+    <ClCompile Include="src\Core\Makcu\Makcu.cpp" />
+    <ClCompile Include="src\Core\Ferrum\Ferrum.cpp" />
+    <ClCompile Include="src\Core\InputDevice.cpp" />
+    <ClCompile Include="src\Core\Aim\ReadOnlyAim.cpp" />
+    <ClCompile Include="src\Core\Aim\FireportTracker.cpp" />
+    <ClCompile Include="src\Core\Logging\Log.cpp" />
+    <ClCompile Include="src\Memory\MemoryClient.cpp" />
+    <ClCompile Include="src\SDK\RuntimeResolver.cpp" />
+    <ClCompile Include="src\GameWorld\WorldSource.cpp" />
+    <ClCompile Include="src\Players\PlayerService.cpp" />
+    <ClCompile Include="src\Unity\ViewMatrix.cpp" />
+    <ClCompile Include="src\Unity\Camera.cpp" />
+    <ClCompile Include="src\Unity\Skeleton.cpp" />
+    <ClCompile Include="src\UI\MainWindow.cpp" />
+    <ClCompile Include="src\Fuser\PlayerDrawing.cpp" />
+    <ClCompile Include="src\UI\Theme.cpp" />
+    <ClCompile Include="third_party\imgui\imgui.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_tables.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_dx9.cpp" />
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="third_party\imgui\misc\cpp\imgui_stdlib.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\App\AppConfig.h" />
+    <ClInclude Include="src\App\Application.h" />
+    <ClInclude Include="src\App\Version.h" />
+    <ClInclude Include="src\Config\ConfigStore.h" />
+    <ClInclude Include="src\Core\Makcu\Makcu.h" />
+    <ClInclude Include="src\Core\Ferrum\Ferrum.h" />
+    <ClInclude Include="src\Core\InputDevice.h" />
+    <ClInclude Include="src\Core\Aim\ReadOnlyAim.h" />
+    <ClInclude Include="src\Core\Aim\FireportTracker.h" />
+    <ClInclude Include="src\Core\Logging\Log.h" />
+    <ClInclude Include="src\Fuser\FuserController.h" />
+    <ClInclude Include="src\Fuser\PlayerDrawing.h" />
+    <ClInclude Include="src\Memory\MemoryClient.h" />
+    <ClInclude Include="src\GameWorld\WorldSource.h" />
+    <ClInclude Include="src\Players\IPlayerSource.h" />
+    <ClInclude Include="src\Players\PlayerModel.h" />
+    <ClInclude Include="src\Players\TeamColours.h" />
+    <ClInclude Include="src\Players\PlayerService.h" />
+    <ClInclude Include="src\SDK\Offsets.h" />
+    <ClInclude Include="src\SDK\TargetProfile.h" />
+    <ClInclude Include="src\SDK\RuntimeResolver.h" />
+    <ClInclude Include="src\Unity\Types.h" />
+    <ClInclude Include="src\Unity\Bones.h" />
+    <ClInclude Include="src\Unity\ViewMatrix.h" />
+    <ClInclude Include="src\Unity\Collections.h" />
+    <ClInclude Include="src\Unity\Camera.h" />
+    <ClInclude Include="src\Unity\Skeleton.h" />
+    <ClInclude Include="src\UI\MainWindow.h" />
+    <ClInclude Include="src\UI\DisplayMonitors.h" />
+    <ClInclude Include="src\UI\IconsFontAwesome7.h" />
+    <ClInclude Include="src\UI\Theme.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="third_party\memprocfs\bin\dbghelp.dll"><TargetPath>dbghelp.dll</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="third_party\memprocfs\bin\FTD3XX.dll"><TargetPath>FTD3XX.dll</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="third_party\memprocfs\bin\leechcore.dll"><TargetPath>leechcore.dll</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="third_party\memprocfs\bin\leechcore_driver.dll"><TargetPath>leechcore_driver.dll</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="third_party\memprocfs\bin\symsrv.dll"><TargetPath>symsrv.dll</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="third_party\memprocfs\bin\tinylz4.dll"><TargetPath>tinylz4.dll</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="third_party\memprocfs\bin\vcruntime140.dll"><TargetPath>vcruntime140.dll</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="third_party\memprocfs\bin\vmm.dll"><TargetPath>vmm.dll</TargetPath><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="fonts\fa-solid-900.otf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="fonts\FONT-AWESOME-LICENSE.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>
