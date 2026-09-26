@@ -46,6 +46,10 @@ msbuild MeatyArena.slnx -m -p:Configuration=Release -p:Platform=x64
 
 The output is written to `MeatyArena\bin\Release`. The project copies the required MemProcFS runtime DLLs and Font Awesome asset into the output automatically.
 
+## Binary Files
+
+Latest prebuilt files should only be obtained from our discord, where we provide them. No files are now uploaded to GitHub
+
 ## Runtime files
 
 On first use, the application creates its configuration and log folders beside the executable. `mmap.txt` is also generated beside the executable.
