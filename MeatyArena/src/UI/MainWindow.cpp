@@ -78,6 +78,12 @@ namespace
 
     constexpr const char* kAimBoneNames[] = {"Head",         "Neck",          "Upper spine", "Mid spine",  "Lower spine", "Pelvis",      "Left collar", "Right collar",
                                              "Left forearm", "Right forearm", "Left palm",   "Right palm", "Left thigh",  "Right thigh", "Left foot",   "Right foot"};
+    constexpr const char* kAutoClickModeNames[] = {"Single", "Auto"};
+
+    const char* AutoClickModeName(AutoClickMode mode)
+    {
+        return mode == AutoClickMode::Single ? "Single" : "Auto";
+    }
 
     std::string VirtualKeyName(int key)
     {
@@ -528,6 +534,8 @@ void MainWindow::RenderFuserTab()
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::TextColored(fuser_.IsRunning() ? ImVec4(0.24f, 0.90f, 0.38f, 1.0f) : ImVec4(0.62f, 0.62f, 0.62f, 1.0f), fuser_.IsRunning() ? "Running" : "Stopped");
+    if (ImGui::Checkbox("Start on launch", &config_.fuser.startOnLaunch))
+        SaveConfig();
     ImGui::Spacing();
     SectionTitle("Monitor", nullptr);
     const auto monitors = DisplayMonitors::Enumerate();
@@ -771,6 +779,14 @@ void MainWindow::RenderDevicesTab()
         changed |= ImGui::Checkbox("Auto Click", &config_.aim.autoFire);
         ImGui::SameLine(0.0f, 28.0f);
         ImGui::BeginDisabled(!config_.aim.autoFire);
+        int autoClickMode = static_cast<int>(config_.aim.autoClickMode);
+        ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::Combo("Fire Mode", &autoClickMode, kAutoClickModeNames, IM_ARRAYSIZE(kAutoClickModeNames)))
+        {
+            config_.aim.autoClickMode = static_cast<AutoClickMode>(autoClickMode);
+            changed = true;
+        }
+        ImGui::SameLine(0.0f, 28.0f);
         changed |= ImGui::Checkbox("Aim Assist", &config_.aim.autoAimAssist);
         ImGui::EndDisabled();
         ImGui::EndDisabled();
@@ -801,7 +817,8 @@ void MainWindow::RenderDevicesTab()
         if (config_.aim.fireportAim)
             ImGui::TextDisabled("Fireport: %s | %s", aim_.Fireport().StateText(), aim_.Fireport().Path());
         if (config_.aim.autoFire)
-            ImGui::TextDisabled("Auto: %s | assist: %s | distance %.1f px | holds %llu", aim_.AutoHolding() ? "holding" : (aim_.AutoAligned() ? "aligned" : "waiting"),
+            ImGui::TextDisabled("Auto Click: %s | %s | assist: %s | distance %.1f px | actions %llu", AutoClickModeName(config_.aim.autoClickMode),
+                                aim_.AutoHolding() ? "holding" : (aim_.AutoPressedThisTick() ? "clicked" : (aim_.AutoAligned() ? "aligned" : "waiting")),
                                 config_.aim.autoAimAssist ? "on" : "off", aim_.LastTargetDistancePixels(), static_cast<unsigned long long>(aim_.AutoHoldCount()));
         ImGui::TextDisabled("Input: %s | key: %s", memory_.KeyboardReady() ? "DMA" : "DMA unavailable", aim_.ActivationHeld() ? "held" : "up");
         if (aim_.LastTarget())
@@ -851,8 +868,9 @@ void MainWindow::RenderDevicesTab()
         SectionTitle("Aim state", nullptr);
         ImGui::Text("Enabled: %s", config_.aim.enabled ? "Yes" : "No");
         ImGui::Text("Fireport aim: %s", config_.aim.fireportAim ? "Yes" : "No");
-        ImGui::Text("Auto: %s | assist: %s | aligned: %s | holding: %s | holds: %llu", config_.aim.autoFire ? "Yes" : "No", config_.aim.autoAimAssist ? "Yes" : "No",
-                    aim_.AutoAligned() ? "Yes" : "No", aim_.AutoHolding() ? "Yes" : "No", static_cast<unsigned long long>(aim_.AutoHoldCount()));
+        ImGui::Text("Auto Click: %s%s | assist: %s | aligned: %s | holding: %s | actions: %llu", config_.aim.autoFire ? "Yes, " : "No",
+                    config_.aim.autoFire ? AutoClickModeName(config_.aim.autoClickMode) : "", config_.aim.autoAimAssist ? "Yes" : "No", aim_.AutoAligned() ? "Yes" : "No",
+                    aim_.AutoHolding() ? "Yes" : "No", static_cast<unsigned long long>(aim_.AutoHoldCount()));
         ImGui::Text("Activation: %s", VirtualKeyName(config_.aim.activationKey).c_str());
         ImGui::Text("Target bone: %s",
                     config_.aim.closestBone ? "Closest to crosshair" : kAimBoneNames[(std::clamp)(config_.aim.targetBoneIndex, 0, IM_ARRAYSIZE(kAimBoneNames) - 1)]);
@@ -936,9 +954,9 @@ void MainWindow::RenderDebugTab()
     ImGui::Text("Origin: %.3f, %.3f, %.3f | forward: %.3f, %.3f, %.3f", fireportOrigin.x, fireportOrigin.y, fireportOrigin.z, fireportForward.x, fireportForward.y,
                 fireportForward.z);
     ImGui::Text("Screen reference: %.1f, %.1f", fireportReference.x, fireportReference.y);
-    ImGui::Text("Auto: %s | assist: %s | aligned: %s | holding: %s | target distance: %.2f px | holds: %llu", config_.aim.autoFire ? "Enabled" : "Disabled",
-                config_.aim.autoAimAssist ? "Enabled" : "Disabled", aim_.AutoAligned() ? "Yes" : "No", aim_.AutoHolding() ? "Yes" : "No", aim_.LastTargetDistancePixels(),
-                static_cast<unsigned long long>(aim_.AutoHoldCount()));
+    ImGui::Text("Auto Click: %s%s | assist: %s | aligned: %s | holding: %s | target distance: %.2f px | actions: %llu", config_.aim.autoFire ? "Enabled, " : "Disabled",
+                config_.aim.autoFire ? AutoClickModeName(config_.aim.autoClickMode) : "", config_.aim.autoAimAssist ? "Enabled" : "Disabled", aim_.AutoAligned() ? "Yes" : "No",
+                aim_.AutoHolding() ? "Yes" : "No", aim_.LastTargetDistancePixels(), static_cast<unsigned long long>(aim_.AutoHoldCount()));
     ImGui::Text("Offsets: Player hands 0x%X | PWA 0x%X | bones 0x%X", ArenaOffsets::Player::HandsController, ArenaOffsets::Player::ProceduralWeaponAnimation,
                 ArenaOffsets::Player::PlayerBones);
     ImGui::Text("Firearm: fireport 0x%X | gun base 0x%X | firearms 0x%X", ArenaOffsets::FirearmController::Fireport, ArenaOffsets::FirearmController::GunBaseTransform,

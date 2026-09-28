@@ -4,7 +4,15 @@
 
 #include <Windows.h>
 #include <winternl.h>
+
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4200 4201)
+#endif
 #include <vmmdll.h>
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #include <atomic>
 #include <array>

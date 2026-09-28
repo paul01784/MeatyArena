@@ -103,6 +103,7 @@ private:
     bool autoAligned_ = false;
     bool autoPressedThisTick_ = false;
     bool autoHolding_ = false;
+    bool autoTriggered_ = false;
     std::uint64_t autoHoldCount_ = 0;
     float lastTargetDistancePixels_ = 0.0f;
     FireportTracker fireport_;

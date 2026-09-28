@@ -27,6 +27,16 @@ namespace
             return SerialDeviceType::Ferrum;
         return SerialDeviceType::None;
     }
+
+    const char* AutoClickModeName(AutoClickMode mode)
+    {
+        return mode == AutoClickMode::Single ? "single" : "auto";
+    }
+
+    AutoClickMode ParseAutoClickMode(const std::string& name)
+    {
+        return name == "single" ? AutoClickMode::Single : AutoClickMode::Auto;
+    }
 } // namespace
 
 ConfigStore::ConfigStore(std::filesystem::path path) : path_(std::move(path))
@@ -60,6 +70,7 @@ bool ConfigStore::Load(AppConfig& config, std::string& error) const
         config.players.showInactive = players.value("showInactive", config.players.showInactive);
 
         const auto& fuser = root.value("fuser", nlohmann::json::object());
+        config.fuser.startOnLaunch = fuser.value("startOnLaunch", config.fuser.startOnLaunch);
         config.fuser.showNames = fuser.value("showNames", config.fuser.showNames);
         config.fuser.showSkeleton = fuser.value("showSkeleton", config.fuser.showSkeleton);
         config.fuser.scale = fuser.value("scale", config.fuser.scale);
@@ -83,6 +94,7 @@ bool ConfigStore::Load(AppConfig& config, std::string& error) const
         config.aim.enabled = aim.value("enabled", config.aim.enabled);
         config.aim.fireportAim = aim.value("fireportAim", config.aim.fireportAim);
         config.aim.autoFire = aim.value("autoFire", config.aim.autoFire);
+        config.aim.autoClickMode = ParseAutoClickMode(aim.value("autoClickMode", std::string(AutoClickModeName(config.aim.autoClickMode))));
         config.aim.autoAimAssist = aim.value("autoAimAssist", config.aim.autoAimAssist);
         config.aim.activationKey = aim.value("activationKey", config.aim.activationKey);
         config.aim.radiusPixels = aim.value("radiusPixels", config.aim.radiusPixels);
@@ -122,7 +134,8 @@ bool ConfigStore::Save(const AppConfig& config, std::string& error) const
                               {"debugOutput", config.connection.debugOutput},
                               {"waitForProcessSeconds", config.connection.waitForProcessSeconds}};
         root["players"] = {{"pollIntervalMs", config.players.pollIntervalMs}, {"showInactive", config.players.showInactive}};
-        root["fuser"] = {{"showNames", config.fuser.showNames},
+        root["fuser"] = {{"startOnLaunch", config.fuser.startOnLaunch},
+                         {"showNames", config.fuser.showNames},
                          {"showSkeleton", config.fuser.showSkeleton},
                          {"scale", config.fuser.scale},
                          {"transparentBackground", config.fuser.transparentBackground},
@@ -141,6 +154,7 @@ bool ConfigStore::Save(const AppConfig& config, std::string& error) const
         root["aim"] = {{"enabled", config.aim.enabled},
                        {"fireportAim", config.aim.fireportAim},
                        {"autoFire", config.aim.autoFire},
+                       {"autoClickMode", AutoClickModeName(config.aim.autoClickMode)},
                        {"autoAimAssist", config.aim.autoAimAssist},
                        {"activationKey", config.aim.activationKey},
                        {"radiusPixels", config.aim.radiusPixels},

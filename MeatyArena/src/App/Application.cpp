@@ -105,6 +105,8 @@ Application::Application()
     Log::Initialize(GetExecutableDirectory() / "logs" / "meatyarena.log");
     if (!configStore_.Load(config_, error))
         configStore_.Save(config_, error);
+    if (config_.fuser.startOnLaunch)
+        fuser_.Start();
     makcu.mouseUnitsPerScreenPixelX = config_.device.makcuMouseUnitsPerScreenPixelX;
     makcu.mouseUnitsPerScreenPixelY = config_.device.makcuMouseUnitsPerScreenPixelY;
     ferrum.mouseUnitsPerScreenPixelX = config_.device.ferrumMouseUnitsPerScreenPixelX;

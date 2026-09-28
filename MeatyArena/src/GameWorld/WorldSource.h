@@ -37,6 +37,8 @@ private:
     {
         PlayerSnapshot snapshot;
         std::uint64_t positionAddress = 0;
+        std::uint64_t lookTransformAddress = 0;
+        std::uint64_t playerBodyAddress = 0;
         std::uint64_t transformVerticesAddress = 0;
         std::uint64_t transformIndicesAddress = 0;
         std::int32_t transformIndex = -1;

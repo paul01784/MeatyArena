@@ -13,9 +13,9 @@
 
 namespace
 {
-    bool Pointer(const MemoryClient& memory, std::uint64_t address, std::uint64_t& value)
+    bool Pointer(const MemoryClient& memory, std::uint64_t address, std::uint64_t& value, bool uncached = false)
     {
-        return memory.TryRead(address, value) && Unity::IsValidAddress(value);
+        return memory.TryRead(address, value, uncached) && Unity::IsValidAddress(value);
     }
 
     Unity::Vector3 Rotate(const Unity::Vector3& v, const Unity::Quaternion& q)
@@ -137,6 +137,7 @@ bool WorldSource::InitializeTransform(std::uint64_t player, Tracked& tracked) co
     const auto offset = tracked.local ? Player::PlayerLookRaycastTransform : ObservedPlayerView::PlayerLookRaycastTransform;
     if (!Pointer(memory_, player + offset, look))
         return false;
+    tracked.lookTransformAddress = look;
     tracked.snapshot.transformStage = 2;
     if (!Pointer(memory_, look + 0x10, internal))
         return false;
@@ -396,6 +397,54 @@ bool WorldSource::ReadPlayers(std::vector<PlayerSnapshot>& out, std::string& err
         tracked.snapshot.active = true;
         tracked.snapshot.local = local;
         tracked.missingTicks = 0;
+
+        const bool validateRuntimeObjects = sampleTick_ % 5 == 0 || !tracked.lookTransformAddress || (!local && !tracked.playerBodyAddress);
+        if (validateRuntimeObjects)
+        {
+            std::uint64_t currentLookTransform = 0;
+            std::uint64_t currentPlayerBody = 0;
+            const auto lookOffset = local ? ArenaOffsets::Player::PlayerLookRaycastTransform : ArenaOffsets::ObservedPlayerView::PlayerLookRaycastTransform;
+            const bool hasLookTransform = Pointer(memory_, player + lookOffset, currentLookTransform, true);
+            const bool hasPlayerBody = local || Pointer(memory_, player + ArenaOffsets::ObservedPlayerView::PlayerBody, currentPlayerBody, true);
+            const bool lookTransformChanged = hasLookTransform && tracked.lookTransformAddress && currentLookTransform != tracked.lookTransformAddress;
+            const bool playerBodyChanged = !local && hasPlayerBody && tracked.playerBodyAddress && currentPlayerBody != tracked.playerBodyAddress;
+            if (lookTransformChanged || playerBodyChanged)
+            {
+                Log::Write("World: runtime objects changed; refreshing respawn state for " + tracked.snapshot.name);
+                tracked.positionAddress = 0;
+                tracked.lookTransformAddress = 0;
+                tracked.transformVerticesAddress = 0;
+                tracked.transformIndicesAddress = 0;
+                tracked.transformIndex = -1;
+                tracked.rotationAddress = 0;
+                tracked.position = {};
+                tracked.rotation = {};
+                tracked.positionFailures = 0;
+                tracked.established = false;
+                tracked.usingBonePosition = false;
+                tracked.lastPositionChangeAt = {};
+                tracked.skeleton.reset();
+                tracked.skeletonFailures = 0;
+                tracked.boneUpdatedAt = {};
+                tracked.snapshot.hasPosition = false;
+                tracked.snapshot.positionFromBones = false;
+                tracked.snapshot.hasHead = false;
+                tracked.snapshot.transformStage = 0;
+                tracked.snapshot.skeletonStage = 0;
+                tracked.snapshot.readyBones = 0;
+                tracked.snapshot.skeletonComponents = 0;
+                tracked.snapshot.skeletonHierarchies = 0;
+                tracked.snapshot.skeletonIndices = 0;
+                tracked.snapshot.skeletonArrays = 0;
+                tracked.snapshot.skeletonReadyGroups = 0;
+                tracked.snapshot.skeletonMaxIndex = 0;
+                tracked.snapshot.bones = {};
+            }
+            if (hasLookTransform)
+                tracked.lookTransformAddress = currentLookTransform;
+            if (!local && hasPlayerBody)
+                tracked.playerBodyAddress = currentPlayerBody;
+        }
         if (!tracked.positionAddress && !tracked.transformVerticesAddress)
             InitializeTransform(player, tracked);
         if (!tracked.rotationAddress)

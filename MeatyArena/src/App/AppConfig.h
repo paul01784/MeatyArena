@@ -11,6 +11,12 @@ enum class SerialDeviceType
     Ferrum
 };
 
+enum class AutoClickMode
+{
+    Single,
+    Auto
+};
+
 struct ConnectionConfig
 {
     std::string deviceUri = "fpga://algo=0";
@@ -28,6 +34,7 @@ struct PlayersConfig
 
 struct FuserConfig
 {
+    bool startOnLaunch = false;
     bool showNames = true;
     bool showSkeleton = true;
     float scale = 1.0f;
@@ -55,6 +62,7 @@ struct AimConfig
     bool enabled = false;
     bool fireportAim = true;
     bool autoFire = false;
+    AutoClickMode autoClickMode = AutoClickMode::Auto;
     bool autoAimAssist = false;
     int activationKey = 0x06;
     float radiusPixels = 30.0f;
@@ -77,7 +85,7 @@ struct WindowConfig
 
 struct AppConfig
 {
-    static constexpr int CurrentVersion = 8;
+    static constexpr int CurrentVersion = 10;
 
     ConnectionConfig connection;
     PlayersConfig players;

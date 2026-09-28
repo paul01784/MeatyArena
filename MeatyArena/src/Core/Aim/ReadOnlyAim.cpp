@@ -12,12 +12,10 @@ namespace
 
 void ReadOnlyAim::StopAutoFire()
 {
-    if (!autoHolding_)
-        return;
-
-    if (inputDevice.IsConnected() && !inputDevice.ButtonUp(InputMouseButton::Left))
+    if (autoHolding_ && inputDevice.IsConnected() && !inputDevice.ButtonUp(InputMouseButton::Left))
         (void)inputDevice.ButtonForceRelease(InputMouseButton::Left);
     autoHolding_ = false;
+    autoTriggered_ = false;
 }
 
 const char* ReadOnlyAim::StateText() const
@@ -45,13 +43,13 @@ const char* ReadOnlyAim::StateText() const
     case AimState::OnTarget:
         return "On target";
     case AimState::AutoFiring:
-        return "Auto holding fire";
+        return "Auto click active";
     case AimState::Moving:
         return "Sending movement";
     case AimState::MoveFailed:
         return "Device movement failed";
     case AimState::AutoFireFailed:
-        return "Auto fire press failed";
+        return "Auto click failed";
     default:
         return "Unknown";
     }
@@ -182,23 +180,54 @@ void ReadOnlyAim::Tick(const AimConfig& config, const MemoryClient& memory, cons
     autoAligned_ = config.fireportAim && config.autoFire && bestDistance <= AutoFireRadiusPixels * AutoFireRadiusPixels;
     if (autoAligned_)
     {
-        if (!autoHolding_)
+        if (config.autoClickMode == AutoClickMode::Single)
         {
-            autoPressedThisTick_ = true;
-            if (!inputDevice.ButtonDown(InputMouseButton::Left))
+            if (autoHolding_)
             {
-                state_ = AimState::AutoFireFailed;
-                return;
+                if (!inputDevice.ButtonUp(InputMouseButton::Left))
+                    (void)inputDevice.ButtonForceRelease(InputMouseButton::Left);
+                autoHolding_ = false;
+                autoTriggered_ = false;
             }
-            autoHolding_ = true;
-            ++autoHoldCount_;
+            if (!autoTriggered_)
+            {
+                if (!inputDevice.ButtonDown(InputMouseButton::Left))
+                {
+                    state_ = AimState::AutoFireFailed;
+                    return;
+                }
+                if (!inputDevice.ButtonUp(InputMouseButton::Left))
+                {
+                    (void)inputDevice.ButtonForceRelease(InputMouseButton::Left);
+                    state_ = AimState::AutoFireFailed;
+                    return;
+                }
+                autoPressedThisTick_ = true;
+                autoTriggered_ = true;
+                ++autoHoldCount_;
+            }
+        }
+        else
+        {
+            autoTriggered_ = false;
+            if (!autoHolding_)
+            {
+                if (!inputDevice.ButtonDown(InputMouseButton::Left))
+                {
+                    state_ = AimState::AutoFireFailed;
+                    return;
+                }
+                autoPressedThisTick_ = true;
+                autoHolding_ = true;
+                ++autoHoldCount_;
+            }
         }
     }
     else
         StopAutoFire();
     if (config.autoFire && !config.autoAimAssist)
     {
-        state_ = autoHolding_ ? AimState::AutoFiring : AimState::OnTarget;
+        state_ = autoHolding_ || autoPressedThisTick_ ? AimState::AutoFiring : AimState::OnTarget;
         return;
     }
     const float strength = (std::clamp)(config.strength, 0.01f, 1.0f);
@@ -207,7 +236,7 @@ void ReadOnlyAim::Tick(const AimConfig& config, const MemoryClient& memory, cons
     lastMoveY_ = (std::clamp)(static_cast<int>(std::lround((best.y - aimReference.y) * strength * inputDevice.GetMouseUnitsPerScreenPixelY())), -limit, limit);
     if (!lastMoveX_ && !lastMoveY_)
     {
-        state_ = autoHolding_ ? AimState::AutoFiring : AimState::OnTarget;
+        state_ = autoHolding_ || autoPressedThisTick_ ? AimState::AutoFiring : AimState::OnTarget;
         return;
     }
     state_ = inputDevice.Move(lastMoveX_, lastMoveY_) ? AimState::Moving : AimState::MoveFailed;
