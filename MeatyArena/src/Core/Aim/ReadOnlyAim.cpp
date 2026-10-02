@@ -7,7 +7,8 @@
 
 namespace
 {
-    constexpr float AutoFireRadiusPixels = 6.0f;
+    constexpr float AutoFireAcquireRadiusPixels = 6.0f;
+    constexpr float MaximumAutoFireHoldBufferPixels = 40.0f;
 } // namespace
 
 void ReadOnlyAim::StopAutoFire()
@@ -67,6 +68,7 @@ void ReadOnlyAim::Tick(const AimConfig& config, const MemoryClient& memory, cons
     lastMoveY_ = 0;
     autoAligned_ = false;
     autoPressedThisTick_ = false;
+    manualFireHeld_ = false;
     lastTargetDistancePixels_ = 0.0f;
     if (!config.enabled)
     {
@@ -125,7 +127,11 @@ void ReadOnlyAim::Tick(const AimConfig& config, const MemoryClient& memory, cons
         return;
     }
     Unity::Vector2 best{};
-    float bestDistance = config.radiusPixels * config.radiusPixels;
+    const float holdBuffer = (std::clamp)(config.autoFireHoldBufferPixels, 0.0f, MaximumAutoFireHoldBufferPixels);
+    const float autoFireReleaseRadius = AutoFireAcquireRadiusPixels + holdBuffer;
+    const bool useAutoFireHoldBuffer = autoHolding_ && config.autoClickMode == AutoClickMode::Auto;
+    const float targetSearchRadius = useAutoFireHoldBuffer ? (std::max)(config.radiusPixels, autoFireReleaseRadius) : config.radiusPixels;
+    float bestDistance = targetSearchRadius * targetSearchRadius;
     int localTeam = -1;
     for (const auto& player : players)
         if (player.active && player.local && player.teamId >= 0)
@@ -177,7 +183,8 @@ void ReadOnlyAim::Tick(const AimConfig& config, const MemoryClient& memory, cons
         return;
     }
     lastTargetDistancePixels_ = std::sqrt(bestDistance);
-    autoAligned_ = config.fireportAim && config.autoFire && bestDistance <= AutoFireRadiusPixels * AutoFireRadiusPixels;
+    const float autoFireRadius = useAutoFireHoldBuffer ? autoFireReleaseRadius : AutoFireAcquireRadiusPixels;
+    autoAligned_ = config.fireportAim && config.autoFire && bestDistance <= autoFireRadius * autoFireRadius;
     if (autoAligned_)
     {
         if (config.autoClickMode == AutoClickMode::Single)
@@ -212,14 +219,18 @@ void ReadOnlyAim::Tick(const AimConfig& config, const MemoryClient& memory, cons
             autoTriggered_ = false;
             if (!autoHolding_)
             {
-                if (!inputDevice.ButtonDown(InputMouseButton::Left))
+                manualFireHeld_ = memory.IsKeyDown(VK_LBUTTON);
+                if (!manualFireHeld_)
                 {
-                    state_ = AimState::AutoFireFailed;
-                    return;
+                    if (!inputDevice.ButtonDown(InputMouseButton::Left))
+                    {
+                        state_ = AimState::AutoFireFailed;
+                        return;
+                    }
+                    autoPressedThisTick_ = true;
+                    autoHolding_ = true;
+                    ++autoHoldCount_;
                 }
-                autoPressedThisTick_ = true;
-                autoHolding_ = true;
-                ++autoHoldCount_;
             }
         }
     }
@@ -227,7 +238,7 @@ void ReadOnlyAim::Tick(const AimConfig& config, const MemoryClient& memory, cons
         StopAutoFire();
     if (config.autoFire && !config.autoAimAssist)
     {
-        state_ = autoHolding_ || autoPressedThisTick_ ? AimState::AutoFiring : AimState::OnTarget;
+        state_ = autoHolding_ || manualFireHeld_ || autoPressedThisTick_ ? AimState::AutoFiring : AimState::OnTarget;
         return;
     }
     const float strength = (std::clamp)(config.strength, 0.01f, 1.0f);
@@ -236,7 +247,7 @@ void ReadOnlyAim::Tick(const AimConfig& config, const MemoryClient& memory, cons
     lastMoveY_ = (std::clamp)(static_cast<int>(std::lround((best.y - aimReference.y) * strength * inputDevice.GetMouseUnitsPerScreenPixelY())), -limit, limit);
     if (!lastMoveX_ && !lastMoveY_)
     {
-        state_ = autoHolding_ || autoPressedThisTick_ ? AimState::AutoFiring : AimState::OnTarget;
+        state_ = autoHolding_ || manualFireHeld_ || autoPressedThisTick_ ? AimState::AutoFiring : AimState::OnTarget;
         return;
     }
     state_ = inputDevice.Move(lastMoveX_, lastMoveY_) ? AimState::Moving : AimState::MoveFailed;

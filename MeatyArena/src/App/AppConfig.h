@@ -63,6 +63,7 @@ struct AimConfig
     bool fireportAim = true;
     bool autoFire = false;
     AutoClickMode autoClickMode = AutoClickMode::Auto;
+    float autoFireHoldBufferPixels = 10.0f;
     bool autoAimAssist = false;
     int activationKey = 0x06;
     float radiusPixels = 30.0f;
@@ -85,7 +86,7 @@ struct WindowConfig
 
 struct AppConfig
 {
-    static constexpr int CurrentVersion = 10;
+    static constexpr int CurrentVersion = 11;
 
     ConnectionConfig connection;
     PlayersConfig players;

@@ -80,6 +80,10 @@ public:
     {
         return autoHolding_;
     }
+    bool ManualFireHeld() const
+    {
+        return manualFireHeld_;
+    }
     std::uint64_t AutoHoldCount() const
     {
         return autoHoldCount_;
@@ -104,6 +108,7 @@ private:
     bool autoPressedThisTick_ = false;
     bool autoHolding_ = false;
     bool autoTriggered_ = false;
+    bool manualFireHeld_ = false;
     std::uint64_t autoHoldCount_ = 0;
     float lastTargetDistancePixels_ = 0.0f;
     FireportTracker fireport_;

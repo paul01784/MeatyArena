@@ -17,6 +17,9 @@
 
 namespace
 {
+    constexpr auto SkeletonPointerRefreshInterval = std::chrono::milliseconds(500);
+    constexpr auto SkeletonBuildRetryInterval = std::chrono::milliseconds(100);
+
     bool Pointer(const MemoryClient& memory, std::uint64_t address, std::uint64_t& value, bool uncached = false)
     {
         return memory.TryRead(address, value, uncached) && Unity::IsValidAddress(value);
@@ -222,34 +225,43 @@ bool Unity::ResolveTransformAccess(const MemoryClient& memory, std::uint64_t can
 
 bool Unity::Skeleton::Initialize(std::uint64_t player)
 {
-    if (cacheReady_ && IsValidAddress(array_))
+    const auto keepCurrent = [this]
+    {
+        return cacheReady_ && IsValidAddress(array_);
+    };
+    const auto now = std::chrono::steady_clock::now();
+    if (IsValidAddress(array_) && now < nextArrayRefreshAt_)
         return true;
+    if (IsValidAddress(array_))
+        nextArrayRefreshAt_ = now + SkeletonPointerRefreshInterval;
     stage_ = 1;
     readyBones_ = 0;
-    std::uint64_t body = 0, root = 0, values = 0;
-    if (!Pointer(memory_, player + ArenaOffsets::ObservedPlayerView::PlayerBody, body))
-    {
-        array_ = 0;
-        return false;
-    }
+    std::uint64_t body = 0, root = 0, values = 0, nextArray = 0;
+    if (!Pointer(memory_, player + ArenaOffsets::ObservedPlayerView::PlayerBody, body, true))
+        return keepCurrent();
     stage_ = 2;
-    if (!Pointer(memory_, body + ArenaOffsets::PlayerBody::SkeletonRootJoint, root))
-    {
-        array_ = 0;
-        return false;
-    }
+    if (!Pointer(memory_, body + ArenaOffsets::PlayerBody::SkeletonRootJoint, root, true))
+        return keepCurrent();
     stage_ = 3;
-    if (!Pointer(memory_, root + ArenaOffsets::DizSkinningSkeleton::Values, values))
-    {
-        array_ = 0;
-        return false;
-    }
+    if (!Pointer(memory_, root + ArenaOffsets::DizSkinningSkeleton::Values, values, true))
+        return keepCurrent();
     stage_ = 4;
-    if (!Pointer(memory_, values + UnityOffsets::ManagedList::ItemsPtr, array_))
+    if (!Pointer(memory_, values + UnityOffsets::ManagedList::ItemsPtr, nextArray, true))
+        return keepCurrent();
+    if (nextArray != array_)
     {
-        array_ = 0;
-        return false;
+        array_ = nextArray;
+        cacheReady_ = false;
+        accesses_ = {};
+        groups_.clear();
+        liveVertices_.clear();
+        liveReadEntries_.clear();
+        diagnostics_ = {};
+        prepared_ = false;
+        nextGroupRefreshAt_ = {};
+        nextBuildAttemptAt_ = {};
     }
+    nextArrayRefreshAt_ = now + SkeletonPointerRefreshInterval;
     stage_ = 5;
     return true;
 }
@@ -266,7 +278,8 @@ bool Unity::Skeleton::BuildCache()
     for (std::size_t boneIndex = 0; boneIndex < SkeletonBones.size(); ++boneIndex)
     {
         std::uint64_t component = 0, candidate = 0;
-        if (!Pointer(memory_, array_ + 0x20 + static_cast<std::uint32_t>(SkeletonBones[boneIndex]) * 8ULL, component) || !Pointer(memory_, component + 0x10, candidate))
+        if (!Pointer(memory_, array_ + 0x20 + static_cast<std::uint32_t>(SkeletonBones[boneIndex]) * 8ULL, component, true) ||
+            !Pointer(memory_, component + 0x10, candidate, true))
             continue;
         ++diagnostics_.components;
         TransformAccessInfo transform;
@@ -286,6 +299,7 @@ bool Unity::Skeleton::BuildCache()
             group.hierarchy = transform.hierarchy;
             group.verticesAddress = transform.vertices;
             group.indicesAddress = transform.indices;
+            group.representativeBone = boneIndex;
             groups_.push_back(std::move(group));
         }
         const auto groupIndex = it->second;
@@ -314,8 +328,32 @@ bool Unity::Skeleton::BuildCache()
         else
             group.parents.clear();
     }
-    cacheReady_ = diagnostics_.readyGroups != 0;
+    cacheReady_ = diagnostics_.arrays == SkeletonBones.size() && diagnostics_.readyGroups == groups_.size();
     return cacheReady_;
+}
+
+bool Unity::Skeleton::RefreshCache()
+{
+    for (const auto& group : groups_)
+    {
+        if (group.representativeBone >= SkeletonBones.size())
+            continue;
+        std::uint64_t component = 0, candidate = 0;
+        const auto bone = SkeletonBones[group.representativeBone];
+        if (!Pointer(memory_, array_ + 0x20 + static_cast<std::uint32_t>(bone) * 8ULL, component, true) || !Pointer(memory_, component + 0x10, candidate, true))
+            continue;
+        TransformAccessInfo transform;
+        if (!ResolveTransformAccess(memory_, candidate, transform))
+            continue;
+        const auto& access = accesses_[group.representativeBone];
+        if (transform.hierarchy == group.hierarchy && transform.vertices == group.verticesAddress && transform.indices == group.indicesAddress &&
+            transform.index == access.index)
+            continue;
+
+        cacheReady_ = false;
+        return BuildCache();
+    }
+    return true;
 }
 
 bool Unity::Skeleton::ReadBone(Bone bone, Vector3& result) const
@@ -366,8 +404,27 @@ bool Unity::Skeleton::PrepareBones(std::vector<MemoryClient::ScatterEntry>& read
 {
     prepared_ = false;
     readyBones_ = 0;
-    if (!IsValidAddress(array_) || (!cacheReady_ && !BuildCache()))
+    if (!IsValidAddress(array_))
         return false;
+    const auto now = std::chrono::steady_clock::now();
+    if (!cacheReady_)
+    {
+        if (now < nextBuildAttemptAt_)
+            return false;
+        nextBuildAttemptAt_ = now + SkeletonBuildRetryInterval;
+        if (!BuildCache())
+            return false;
+        nextGroupRefreshAt_ = now + SkeletonPointerRefreshInterval;
+    }
+    if (now >= nextGroupRefreshAt_)
+    {
+        nextGroupRefreshAt_ = now + SkeletonPointerRefreshInterval;
+        if (!RefreshCache())
+        {
+            nextBuildAttemptAt_ = now + SkeletonBuildRetryInterval;
+            return false;
+        }
+    }
     liveVertices_.clear();
     liveVertices_.resize(groups_.size());
     liveReadEntries_.assign(groups_.size(), static_cast<std::size_t>(-1));

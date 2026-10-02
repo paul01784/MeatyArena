@@ -109,7 +109,7 @@ bool WorldSource::ResolveWorld(std::string& error)
     if (world_ != nextWorld)
     {
         tracked_.clear();
-        emptyTicks_ = 0;
+        lastRegisteredPlayerCount_ = 0;
         world_ = nextWorld;
     }
     return true;
@@ -137,7 +137,6 @@ bool WorldSource::InitializeTransform(std::uint64_t player, Tracked& tracked) co
     const auto offset = tracked.local ? Player::PlayerLookRaycastTransform : ObservedPlayerView::PlayerLookRaycastTransform;
     if (!Pointer(memory_, player + offset, look))
         return false;
-    tracked.lookTransformAddress = look;
     tracked.snapshot.transformStage = 2;
     if (!Pointer(memory_, look + 0x10, internal))
         return false;
@@ -152,7 +151,6 @@ bool WorldSource::InitializeTransform(std::uint64_t player, Tracked& tracked) co
     tracked.transformIndicesAddress = transform.indices;
     tracked.transformIndex = transform.index;
     tracked.positionAddress = transform.hasCachedWorldPosition ? transform.hierarchy + UnityOffsets::TransformHierarchy::WorldPosition : 0;
-    tracked.lastPositionChangeAt = {};
     tracked.snapshot.transformStage = 6;
     return true;
 }
@@ -223,8 +221,6 @@ int WorldSource::ResolveTeamId(std::uint64_t player, bool local) const
 
 void WorldSource::ReadRealtime()
 {
-    constexpr auto FrozenPositionLimit = std::chrono::milliseconds(1500);
-    const auto now = std::chrono::steady_clock::now();
     std::vector<MemoryClient::ScatterEntry> reads;
     reads.reserve(tracked_.size() * 2);
     for (auto& [address, tracked] : tracked_)
@@ -256,25 +252,6 @@ void WorldSource::ReadRealtime()
         const bool finite = p.IsFinite() && std::abs(p.x) < 4096 && std::abs(p.y) < 4096 && std::abs(p.z) < 4096;
         if (finite && p.y > -500 && p.LengthSquared() > 0)
         {
-            const Unity::Vector3 previous{tracked.snapshot.x, tracked.snapshot.y, tracked.snapshot.z};
-            const bool moved = !tracked.snapshot.hasPosition || (p - previous).LengthSquared() > 0.000001f;
-            if (moved || tracked.lastPositionChangeAt.time_since_epoch().count() == 0)
-                tracked.lastPositionChangeAt = now;
-            else if (tracked.established && now - tracked.lastPositionChangeAt > FrozenPositionLimit)
-            {
-                Log::Write("World: frozen transform reinitializing for " + tracked.snapshot.name);
-                tracked.positionAddress = 0;
-                tracked.transformVerticesAddress = 0;
-                tracked.transformIndicesAddress = 0;
-                tracked.transformIndex = -1;
-                tracked.rotationAddress = 0;
-                tracked.established = false;
-                tracked.positionFailures = 0;
-                tracked.lastPositionChangeAt = {};
-                tracked.skeleton.reset();
-                tracked.skeletonFailures = 0;
-                continue;
-            }
             tracked.snapshot.x = p.x;
             tracked.snapshot.y = p.y;
             tracked.snapshot.z = p.z;
@@ -284,20 +261,6 @@ void WorldSource::ReadRealtime()
                 Log::Write("World: cached transform recovered for " + tracked.snapshot.name);
             tracked.usingBonePosition = false;
             tracked.established = true;
-            tracked.positionFailures = 0;
-        }
-        else if (tracked.established && ++tracked.positionFailures >= 5)
-        {
-            tracked.positionAddress = 0;
-            tracked.transformVerticesAddress = 0;
-            tracked.transformIndicesAddress = 0;
-            tracked.transformIndex = -1;
-            tracked.rotationAddress = 0;
-            tracked.established = false;
-            tracked.positionFailures = 0;
-            tracked.lastPositionChangeAt = {};
-            tracked.skeleton.reset();
-            tracked.skeletonFailures = 0;
         }
     }
 }
@@ -313,49 +276,68 @@ bool WorldSource::ReadPlayers(std::vector<PlayerSnapshot>& out, std::string& err
         localPlayer_ = 0;
         publishedLocalPlayer_ = 0;
         inRaid_ = false;
+        lastActivePlayerListAt_ = {};
+        lastRegisteredPlayerCount_ = 0;
         error = "Connect PCLeech first.";
         return false;
     }
-    if (!ResolveWorld(error))
+    constexpr auto RaidStateRetention = std::chrono::seconds(10);
+    const auto readNow = std::chrono::steady_clock::now();
+    const auto retainRaidState = [&]
+    {
+        return inRaid_.load(std::memory_order_acquire) && lastActivePlayerListAt_.time_since_epoch().count() != 0 && readNow - lastActivePlayerListAt_ < RaidStateRetention;
+    };
+    const auto clearRaidState = [&]
     {
         inRaid_ = false;
         publishedWorld_ = 0;
         localPlayer_ = 0;
         publishedLocalPlayer_ = 0;
+        world_ = 0;
+        tracked_.clear();
+        lastActivePlayerListAt_ = {};
+        lastRegisteredPlayerCount_ = 0;
+    };
+    if (!ResolveWorld(error))
+    {
+        if (!retainRaidState())
+            clearRaidState();
         return false;
     }
     publishedWorld_ = world_;
     std::uint64_t list = 0;
-    if (!Pointer(memory_, world_ + ArenaOffsets::ClientLocalGameWorld::RegisteredPlayers, list))
+    if (!Pointer(memory_, world_ + ArenaOffsets::ClientLocalGameWorld::RegisteredPlayers, list, true))
     {
-        inRaid_ = false;
+        if (!retainRaidState())
+            clearRaidState();
         error = "RegisteredPlayers list is unavailable.";
         return false;
     }
     std::vector<std::uint64_t> pointers;
-    if (!Unity::Collections::ReadList(memory_, list, pointers, 64))
+    if (!Unity::Collections::ReadList(memory_, list, pointers, 64, true))
     {
-        inRaid_ = false;
+        if (!retainRaidState())
+            clearRaidState();
         error = "RegisteredPlayers list read failed or count exceeds 64.";
         return false;
     }
     if (pointers.empty())
     {
-        inRaid_ = false;
-        if (++emptyTicks_ >= 30)
-        {
-            world_ = 0;
-            localPlayer_ = 0;
-            publishedLocalPlayer_ = 0;
-            tracked_.clear();
-        }
+        if (!retainRaidState())
+            clearRaidState();
         error = "Waiting for active player list.";
         return false;
     }
     inRaid_ = true;
-    emptyTicks_ = 0;
+    lastActivePlayerListAt_ = readNow;
+    const auto registeredCount = static_cast<std::uint32_t>(pointers.size());
+    if (registeredCount != lastRegisteredPlayerCount_)
+    {
+        Log::Write("World: registered player count changed from " + std::to_string(lastRegisteredPlayerCount_) + " to " + std::to_string(registeredCount) + ".");
+        lastRegisteredPlayerCount_ = registeredCount;
+    }
     std::uint64_t nextLocalPlayer = 0;
-    if (memory_.TryRead(world_ + ArenaOffsets::ClientLocalGameWorld::MainPlayer, nextLocalPlayer))
+    if (memory_.TryRead(world_ + ArenaOffsets::ClientLocalGameWorld::MainPlayer, nextLocalPlayer, true))
     {
         if (!Unity::IsValidAddress(nextLocalPlayer))
             nextLocalPlayer = 0;
@@ -391,60 +373,23 @@ bool WorldSource::ReadPlayers(std::vector<PlayerSnapshot>& out, std::string& err
                 std::int32_t side = 0;
                 memory_.TryRead(player + ArenaOffsets::ObservedPlayerView::Side, side);
                 tracked.snapshot.side = static_cast<std::uint32_t>((std::max)(0, side));
-                memory_.TryRead(player + ArenaOffsets::ObservedPlayerView::IsAI, tracked.snapshot.isAI);
+                tracked.classificationReady = memory_.TryRead(player + ArenaOffsets::ObservedPlayerView::IsAI, tracked.snapshot.isAI, true);
             }
+        }
+        if (!local && !tracked.classificationReady)
+            tracked.classificationReady = memory_.TryRead(player + ArenaOffsets::ObservedPlayerView::IsAI, tracked.snapshot.isAI, true);
+        if (!local && (tracked.snapshot.name.empty() || tracked.snapshot.name == "Player"))
+        {
+            std::uint64_t name = 0;
+            std::string resolvedName;
+            if (Pointer(memory_, player + ArenaOffsets::ObservedPlayerView::NickName, name) && ReadManagedString(name, resolvedName) && !resolvedName.empty())
+                tracked.snapshot.name = std::move(resolvedName);
         }
         tracked.snapshot.active = true;
         tracked.snapshot.local = local;
-        tracked.missingTicks = 0;
-
-        const bool validateRuntimeObjects = sampleTick_ % 5 == 0 || !tracked.lookTransformAddress || (!local && !tracked.playerBodyAddress);
-        if (validateRuntimeObjects)
-        {
-            std::uint64_t currentLookTransform = 0;
-            std::uint64_t currentPlayerBody = 0;
-            const auto lookOffset = local ? ArenaOffsets::Player::PlayerLookRaycastTransform : ArenaOffsets::ObservedPlayerView::PlayerLookRaycastTransform;
-            const bool hasLookTransform = Pointer(memory_, player + lookOffset, currentLookTransform, true);
-            const bool hasPlayerBody = local || Pointer(memory_, player + ArenaOffsets::ObservedPlayerView::PlayerBody, currentPlayerBody, true);
-            const bool lookTransformChanged = hasLookTransform && tracked.lookTransformAddress && currentLookTransform != tracked.lookTransformAddress;
-            const bool playerBodyChanged = !local && hasPlayerBody && tracked.playerBodyAddress && currentPlayerBody != tracked.playerBodyAddress;
-            if (lookTransformChanged || playerBodyChanged)
-            {
-                Log::Write("World: runtime objects changed; refreshing respawn state for " + tracked.snapshot.name);
-                tracked.positionAddress = 0;
-                tracked.lookTransformAddress = 0;
-                tracked.transformVerticesAddress = 0;
-                tracked.transformIndicesAddress = 0;
-                tracked.transformIndex = -1;
-                tracked.rotationAddress = 0;
-                tracked.position = {};
-                tracked.rotation = {};
-                tracked.positionFailures = 0;
-                tracked.established = false;
-                tracked.usingBonePosition = false;
-                tracked.lastPositionChangeAt = {};
-                tracked.skeleton.reset();
-                tracked.skeletonFailures = 0;
-                tracked.boneUpdatedAt = {};
-                tracked.snapshot.hasPosition = false;
-                tracked.snapshot.positionFromBones = false;
-                tracked.snapshot.hasHead = false;
-                tracked.snapshot.transformStage = 0;
-                tracked.snapshot.skeletonStage = 0;
-                tracked.snapshot.readyBones = 0;
-                tracked.snapshot.skeletonComponents = 0;
-                tracked.snapshot.skeletonHierarchies = 0;
-                tracked.snapshot.skeletonIndices = 0;
-                tracked.snapshot.skeletonArrays = 0;
-                tracked.snapshot.skeletonReadyGroups = 0;
-                tracked.snapshot.skeletonMaxIndex = 0;
-                tracked.snapshot.bones = {};
-            }
-            if (hasLookTransform)
-                tracked.lookTransformAddress = currentLookTransform;
-            if (!local && hasPlayerBody)
-                tracked.playerBodyAddress = currentPlayerBody;
-        }
+        if (tracked.missingSince.time_since_epoch().count() != 0)
+            Log::Write("World: player returned to registered list: " + tracked.snapshot.name);
+        tracked.missingSince = {};
         if (!tracked.positionAddress && !tracked.transformVerticesAddress)
             InitializeTransform(player, tracked);
         if (!tracked.rotationAddress)
@@ -457,32 +402,43 @@ bool WorldSource::ReadPlayers(std::vector<PlayerSnapshot>& out, std::string& err
     }
     for (auto it = tracked_.begin(); it != tracked_.end();)
     {
-        if (!seen.contains(it->first) && ++it->second.missingTicks >= 5)
-            it = tracked_.erase(it);
+        const bool listed = seen.contains(it->first);
+        if (!listed)
+        {
+            constexpr auto MissingPlayerRetention = std::chrono::seconds(2);
+            if (it->second.missingSince.time_since_epoch().count() == 0)
+            {
+                it->second.missingSince = readNow;
+                Log::Write("World: retaining player missing from registered list: " + it->second.snapshot.name);
+            }
+            if (readNow - it->second.missingSince >= MissingPlayerRetention)
+            {
+                Log::Write("World: removing player absent from registered list: " + it->second.snapshot.name);
+                it = tracked_.erase(it);
+            }
+            else
+            {
+                // Retain cached state briefly in case the list sample was transient, but do not
+                // publish or update stale runtime pointers as an active player.
+                it->second.snapshot.active = false;
+                ++it;
+            }
+        }
         else
         {
-            it->second.snapshot.active = seen.contains(it->first);
+            it->second.snapshot.active = true;
             ++it;
         }
     }
     ReadRealtime();
     ++sampleTick_;
 
-    constexpr int SkeletonFailureLimit = 20;
-    constexpr auto BoneHoldTime = std::chrono::milliseconds(250);
-    const auto boneNow = std::chrono::steady_clock::now();
-    const auto expireStaleBones = [&](Tracked& tracked)
+    const auto refreshBoneSummary = [](Tracked& tracked)
     {
         std::uint32_t retainedBones = 0;
-        for (std::size_t index = 0; index < tracked.snapshot.bones.size(); ++index)
-        {
-            auto& bone = tracked.snapshot.bones[index];
-            const auto updatedAt = tracked.boneUpdatedAt[index];
-            if (bone.valid && (updatedAt.time_since_epoch().count() == 0 || boneNow - updatedAt > BoneHoldTime))
-                bone = {};
+        for (const auto& bone : tracked.snapshot.bones)
             if (bone.valid)
                 ++retainedBones;
-        }
         tracked.snapshot.readyBones = retainedBones;
         const auto& head = tracked.snapshot.bones[0];
         tracked.snapshot.hasHead = head.valid;
@@ -503,23 +459,14 @@ bool WorldSource::ReadPlayers(std::vector<PlayerSnapshot>& out, std::string& err
         if (!tracked.snapshot.active || tracked.local)
             continue;
         if (!tracked.skeleton)
-        {
-            auto skeleton = std::make_unique<Unity::Skeleton>(memory_);
-            if (skeleton->Initialize(address))
-                tracked.skeleton = std::move(skeleton);
-        }
-        if (tracked.skeleton && tracked.skeleton->PrepareBones(boneReads))
+            tracked.skeleton = std::make_unique<Unity::Skeleton>(memory_);
+        if (tracked.skeleton->Initialize(address) && tracked.skeleton->PrepareBones(boneReads))
         {
             skeletonTargets.push_back(&tracked);
             continue;
         }
-        if (tracked.skeleton && ++tracked.skeletonFailures >= SkeletonFailureLimit)
-        {
-            tracked.skeleton.reset();
-            tracked.skeletonFailures = 0;
-        }
         tracked.snapshot.skeletonStage = tracked.skeleton ? tracked.skeleton->Stage() : 0;
-        expireStaleBones(tracked);
+        refreshBoneSummary(tracked);
     }
 
     std::vector<bool> completedBoneReads;
@@ -530,49 +477,16 @@ bool WorldSource::ReadPlayers(std::vector<PlayerSnapshot>& out, std::string& err
         auto& tracked = *target;
         std::array<Unity::BoneSample, Unity::SkeletonBones.size()> freshBones{};
         const bool skeletonReady = tracked.skeleton->FinishBones(freshBones, completedBoneReads);
-        std::size_t acceptedBones = 0;
         if (skeletonReady)
         {
-            constexpr std::size_t pelvisIndex = 5;
-            const Unity::Vector3* anchor = freshBones[pelvisIndex].valid ? &freshBones[pelvisIndex].position : nullptr;
-            if (!anchor)
-                for (const auto& bone : freshBones)
-                    if (bone.valid && bone.position.IsFinite())
-                    {
-                        anchor = &bone.position;
-                        break;
-                    }
-
             for (std::size_t index = 0; index < freshBones.size(); ++index)
             {
                 const auto& fresh = freshBones[index];
                 if (!fresh.valid || !fresh.position.IsFinite() || std::abs(fresh.position.x) >= 4096.0f || std::abs(fresh.position.y) >= 4096.0f ||
                     std::abs(fresh.position.z) >= 4096.0f)
                     continue;
-                if (anchor && (fresh.position - *anchor).LengthSquared() > 25.0f)
-                    continue;
-                if (tracked.snapshot.hasPosition)
-                {
-                    const Unity::Vector3 playerPosition{tracked.snapshot.x, tracked.snapshot.y, tracked.snapshot.z};
-                    if ((fresh.position - playerPosition).LengthSquared() > 25.0f)
-                        continue;
-                }
-                const auto& previous = tracked.snapshot.bones[index];
-                if (previous.valid && (fresh.position - previous.position).LengthSquared() > 9.0f)
-                    continue;
                 tracked.snapshot.bones[index] = fresh;
-                tracked.boneUpdatedAt[index] = boneNow;
-                ++acceptedBones;
             }
-        }
-        if (acceptedBones != 0)
-            tracked.skeletonFailures = 0;
-        else if (++tracked.skeletonFailures >= SkeletonFailureLimit)
-        {
-            tracked.skeleton.reset();
-            tracked.skeletonFailures = 0;
-            expireStaleBones(tracked);
-            continue;
         }
         tracked.snapshot.skeletonStage = tracked.skeleton->Stage();
         const auto& skeletonDiagnostics = tracked.skeleton->GetDiagnostics();
@@ -582,7 +496,7 @@ bool WorldSource::ReadPlayers(std::vector<PlayerSnapshot>& out, std::string& err
         tracked.snapshot.skeletonArrays = skeletonDiagnostics.arrays;
         tracked.snapshot.skeletonReadyGroups = skeletonDiagnostics.readyGroups;
         tracked.snapshot.skeletonMaxIndex = skeletonDiagnostics.maxIndex;
-        expireStaleBones(tracked);
+        refreshBoneSummary(tracked);
 
         constexpr std::size_t pelvisIndex = 5;
         constexpr std::size_t leftFootIndex = 14;
@@ -615,11 +529,8 @@ bool WorldSource::ReadPlayers(std::vector<PlayerSnapshot>& out, std::string& err
 
         if (hasBonePosition && bonePosition.IsFinite() && bonePosition.y > -500.0f && bonePosition.LengthSquared() >= 1.0f)
         {
-            const Unity::Vector3 current{tracked.snapshot.x, tracked.snapshot.y, tracked.snapshot.z};
-            const auto delta = bonePosition - current;
             const bool cachedMissing = !tracked.snapshot.hasPosition || !tracked.established;
-            const bool cachedStale = tracked.established && delta.LengthSquared() >= 2.25f;
-            if (cachedMissing || cachedStale)
+            if (cachedMissing)
             {
                 tracked.snapshot.x = bonePosition.x;
                 tracked.snapshot.y = bonePosition.y;
@@ -629,13 +540,6 @@ bool WorldSource::ReadPlayers(std::vector<PlayerSnapshot>& out, std::string& err
                 if (!tracked.usingBonePosition)
                     Log::Write("World: using bone-derived position for " + tracked.snapshot.name);
                 tracked.usingBonePosition = true;
-                if (cachedStale)
-                {
-                    tracked.positionAddress = 0;
-                    tracked.established = false;
-                    tracked.positionFailures = 0;
-                    tracked.lastPositionChangeAt = {};
-                }
             }
         }
     }

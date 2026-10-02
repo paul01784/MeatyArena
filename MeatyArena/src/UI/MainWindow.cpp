@@ -470,8 +470,8 @@ void MainWindow::RenderPlayersTab()
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
                 const ArenaTeams::Colour colour = player.local ? ArenaTeams::Colour{50, 205, 50} : ArenaTeams::DisplayColour(-1, false, player.isAI);
-                ImGui::TextColored(ImVec4(colour.r / 255.0f, colour.g / 255.0f, colour.b / 255.0f, 1.0f), "%s%s%s", player.name.c_str(), player.local ? " (you)" : "",
-                                   player.isAI ? " [AI]" : "");
+                const std::string displayName = PlayerLabels::DisplayName(player);
+                ImGui::TextColored(ImVec4(colour.r / 255.0f, colour.g / 255.0f, colour.b / 255.0f, 1.0f), "%s%s", displayName.c_str(), player.local ? " (you)" : "");
             }
             ImGui::EndTable();
         }
@@ -501,8 +501,8 @@ void MainWindow::RenderPlayersTab()
                     ImGui::TableSetColumnIndex(0);
                     const ArenaTeams::Colour colour =
                         player.local ? ArenaTeams::Colour{50, 205, 50} : ArenaTeams::DisplayColour(player.teamId, localTeam >= 0 && player.teamId == localTeam, player.isAI);
-                    ImGui::TextColored(ImVec4(colour.r / 255.0f, colour.g / 255.0f, colour.b / 255.0f, 1.0f), "%s%s%s", player.name.c_str(), player.local ? " (you)" : "",
-                                       player.isAI ? " [AI]" : "");
+                    const std::string displayName = PlayerLabels::DisplayName(player);
+                    ImGui::TextColored(ImVec4(colour.r / 255.0f, colour.g / 255.0f, colour.b / 255.0f, 1.0f), "%s%s", displayName.c_str(), player.local ? " (you)" : "");
                 }
                 ImGui::EndTable();
             }
@@ -788,6 +788,10 @@ void MainWindow::RenderDevicesTab()
         }
         ImGui::SameLine(0.0f, 28.0f);
         changed |= ImGui::Checkbox("Aim Assist", &config_.aim.autoAimAssist);
+        ImGui::SetNextItemWidth(280.0f);
+        changed |= ImGui::SliderFloat("Auto hold buffer", &config_.aim.autoFireHoldBufferPixels, 0.0f, 40.0f, "+%.0f px");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Auto fire starts within 6 px, then stays held within 6 px plus this buffer.");
         ImGui::EndDisabled();
         ImGui::EndDisabled();
 
@@ -817,9 +821,11 @@ void MainWindow::RenderDevicesTab()
         if (config_.aim.fireportAim)
             ImGui::TextDisabled("Fireport: %s | %s", aim_.Fireport().StateText(), aim_.Fireport().Path());
         if (config_.aim.autoFire)
-            ImGui::TextDisabled("Auto Click: %s | %s | assist: %s | distance %.1f px | actions %llu", AutoClickModeName(config_.aim.autoClickMode),
-                                aim_.AutoHolding() ? "holding" : (aim_.AutoPressedThisTick() ? "clicked" : (aim_.AutoAligned() ? "aligned" : "waiting")),
-                                config_.aim.autoAimAssist ? "on" : "off", aim_.LastTargetDistancePixels(), static_cast<unsigned long long>(aim_.AutoHoldCount()));
+            ImGui::TextDisabled(
+                "Auto Click: %s | %s | assist: %s | distance %.1f px | hold buffer +%.0f px | actions %llu", AutoClickModeName(config_.aim.autoClickMode),
+                aim_.AutoHolding() ? "holding" : (aim_.ManualFireHeld() ? "manual hold" : (aim_.AutoPressedThisTick() ? "clicked" : (aim_.AutoAligned() ? "aligned" : "waiting"))),
+                config_.aim.autoAimAssist ? "on" : "off", aim_.LastTargetDistancePixels(), config_.aim.autoFireHoldBufferPixels,
+                static_cast<unsigned long long>(aim_.AutoHoldCount()));
         ImGui::TextDisabled("Input: %s | key: %s", memory_.KeyboardReady() ? "DMA" : "DMA unavailable", aim_.ActivationHeld() ? "held" : "up");
         if (aim_.LastTarget())
         {
@@ -887,7 +893,8 @@ void MainWindow::RenderDevicesTab()
 void MainWindow::RenderDebugTab()
 {
     const MemoryStatus status = memory_.GetStatus();
-    const auto logs = Log::Recent();
+    Log::UpdateRecent(debugLogRevision_, debugLogs_);
+    const auto& logs = debugLogs_;
     const auto players = players_.GetPlayers();
     const double failureRate = status.readOperations ? 100.0 * static_cast<double>(status.readFailures) / static_cast<double>(status.readOperations) : 0.0;
 
@@ -986,7 +993,8 @@ void MainWindow::RenderDebugTab()
         {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
-            ImGui::TextUnformatted(player.name.c_str());
+            const std::string displayName = PlayerLabels::DisplayName(player);
+            ImGui::TextUnformatted(displayName.c_str());
             ImGui::TableSetColumnIndex(1);
             ImGui::TextUnformatted(!player.hasPosition ? "pending" : player.positionFromBones ? "bones" : "cached transform");
             ImGui::TableSetColumnIndex(2);
@@ -1021,7 +1029,8 @@ void MainWindow::RenderDebugTab()
                << fireportOrigin.z << ") forward=(" << fireportForward.x << ", " << fireportForward.y << ", " << fireportForward.z << ") screen=(" << fireportReference.x << ", "
                << fireportReference.y << ")\n";
         for (const auto& player : players)
-            report << player.name << ": position=" << (player.hasPosition ? (player.positionFromBones ? "bones" : "cached") : "pending") << " (" << player.x << ", " << player.y
+            report << PlayerLabels::DisplayName(player) << ": side=" << player.side << " ai=" << (player.isAI ? "yes" : "no")
+                   << ", position=" << (player.hasPosition ? (player.positionFromBones ? "bones" : "cached") : "pending") << " (" << player.x << ", " << player.y
                    << ", " << player.z << ")"
                    << ", transform=" << static_cast<unsigned>(player.transformStage) << "/6 idx=" << player.transformIndex
                    << ", skeleton=" << static_cast<unsigned>(player.skeletonStage) << "/8 bones=" << player.readyBones << " components=" << player.skeletonComponents
@@ -1035,9 +1044,13 @@ void MainWindow::RenderDebugTab()
     const float logHeight = (std::max)(130.0f, ImGui::GetContentRegionAvail().y);
     if (ImGui::BeginChild("##DebugLog", ImVec2(0.0f, logHeight), true, ImGuiWindowFlags_HorizontalScrollbar))
     {
-        for (const auto& line : logs)
-            ImGui::TextUnformatted(line.c_str());
-        if (debugAutoScroll_ && ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f)
+        const bool wasAtBottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f;
+        ImGuiListClipper clipper;
+        clipper.Begin(static_cast<int>(logs.size()));
+        while (clipper.Step())
+            for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
+                ImGui::TextUnformatted(logs[static_cast<std::size_t>(index)].c_str());
+        if (debugAutoScroll_ && wasAtBottom)
             ImGui::SetScrollHereY(1.0f);
     }
     ImGui::EndChild();

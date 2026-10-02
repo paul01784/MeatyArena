@@ -54,6 +54,8 @@ std::string PlayerService::GetLastError() const
 
 void PlayerService::Worker()
 {
+    constexpr auto FailedSampleRetention = std::chrono::seconds(10);
+    std::chrono::steady_clock::time_point lastSuccessfulSample{};
 
     while (!stop_)
     {
@@ -67,6 +69,7 @@ void PlayerService::Worker()
                 players_ = std::move(nextPlayers);
                 lastError_.clear();
             }
+            lastSuccessfulSample = std::chrono::steady_clock::now();
             ++successfulSamples_;
         }
         else
@@ -75,7 +78,14 @@ void PlayerService::Worker()
             if (error != lastError_ && error != "Connect DMA first.")
                 Log::Write("Player worker: " + error);
             lastError_ = std::move(error);
-            players_.clear();
+            const auto failedAt = std::chrono::steady_clock::now();
+            const bool clearPlayers = lastSuccessfulSample.time_since_epoch().count() == 0 || failedAt - lastSuccessfulSample >= FailedSampleRetention ||
+                                      lastError_ == "Connect PCLeech first.";
+            if (clearPlayers)
+                players_.clear();
+            else
+                for (auto& player : players_)
+                    player.active = false;
             ++failedSamples_;
         }
         const auto finished = std::chrono::steady_clock::now();

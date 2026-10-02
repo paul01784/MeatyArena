@@ -86,6 +86,8 @@ private:
     HWND__* fuserWindowHandle_ = nullptr;
     bool fuserTransparencyApplied_ = false;
     bool debugAutoScroll_ = true;
+    std::uint64_t debugLogRevision_ = 0;
+    std::vector<std::string> debugLogs_;
     DevicePage devicePage_ = DevicePage::Connection;
     bool capturingAimKey_ = false;
     std::string deviceTestMessage_;

@@ -95,6 +95,7 @@ bool ConfigStore::Load(AppConfig& config, std::string& error) const
         config.aim.fireportAim = aim.value("fireportAim", config.aim.fireportAim);
         config.aim.autoFire = aim.value("autoFire", config.aim.autoFire);
         config.aim.autoClickMode = ParseAutoClickMode(aim.value("autoClickMode", std::string(AutoClickModeName(config.aim.autoClickMode))));
+        config.aim.autoFireHoldBufferPixels = aim.value("autoFireHoldBufferPixels", config.aim.autoFireHoldBufferPixels);
         config.aim.autoAimAssist = aim.value("autoAimAssist", config.aim.autoAimAssist);
         config.aim.activationKey = aim.value("activationKey", config.aim.activationKey);
         config.aim.radiusPixels = aim.value("radiusPixels", config.aim.radiusPixels);
@@ -155,6 +156,7 @@ bool ConfigStore::Save(const AppConfig& config, std::string& error) const
                        {"fireportAim", config.aim.fireportAim},
                        {"autoFire", config.aim.autoFire},
                        {"autoClickMode", AutoClickModeName(config.aim.autoClickMode)},
+                       {"autoFireHoldBufferPixels", config.aim.autoFireHoldBufferPixels},
                        {"autoAimAssist", config.aim.autoAimAssist},
                        {"activationKey", config.aim.activationKey},
                        {"radiusPixels", config.aim.radiusPixels},

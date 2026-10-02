@@ -1,6 +1,6 @@
 #pragma once
 
-#define MEATYARENA_VERSION_LITERAL "1.0.2"
+#define MEATYARENA_VERSION_LITERAL "1.0.3"
 #define MEATYARENA_WIDEN_IMPL(value) L##value
 #define MEATYARENA_WIDEN(value) MEATYARENA_WIDEN_IMPL(value)
 

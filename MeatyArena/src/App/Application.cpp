@@ -26,7 +26,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND window, UINT m
 
 namespace
 {
-    constexpr auto MainWindowFrameInterval = std::chrono::milliseconds(33);
+    constexpr auto MainWindowFrameInterval = std::chrono::microseconds(16667);
     constexpr auto BackgroundLoopInterval = std::chrono::microseconds(16667);
     constexpr auto ActiveFuserLoopInterval = std::chrono::microseconds(4167);
 
@@ -205,8 +205,9 @@ int Application::Run(HINSTANCE instance, int showCommand)
         ImGui::EndFrame();
 
         const auto renderNow = std::chrono::steady_clock::now();
+        const bool highRefreshFuser = fuser_.IsRunning() && worldSource_.InRaid();
         HRESULT result = S_OK;
-        if (renderNow >= nextMainWindowFrame)
+        if (!highRefreshFuser || renderNow >= nextMainWindowFrame)
         {
             g_Device->SetRenderState(D3DRS_ZENABLE, FALSE);
             g_Device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
@@ -220,7 +221,7 @@ int Application::Run(HINSTANCE instance, int showCommand)
                 g_Device->EndScene();
             }
             result = g_Device->Present(nullptr, nullptr, nullptr, nullptr);
-            nextMainWindowFrame = renderNow + MainWindowFrameInterval;
+            nextMainWindowFrame = highRefreshFuser ? renderNow + MainWindowFrameInterval : renderNow;
         }
         else
             ImGui::Render();
@@ -238,7 +239,6 @@ int Application::Run(HINSTANCE instance, int showCommand)
         if (result == D3DERR_DEVICELOST && g_Device->TestCooperativeLevel() == D3DERR_DEVICENOTRESET)
             ResetDevice();
 
-        const bool highRefreshFuser = fuser_.IsRunning() && worldSource_.InRaid();
         nextLoopFrame += highRefreshFuser ? ActiveFuserLoopInterval : BackgroundLoopInterval;
         const auto loopNow = std::chrono::steady_clock::now();
         if (nextLoopFrame < loopNow - std::chrono::milliseconds(100))

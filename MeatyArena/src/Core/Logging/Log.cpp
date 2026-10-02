@@ -11,6 +11,7 @@ namespace
     std::mutex mutex;
     std::filesystem::path path;
     std::deque<std::string> lines;
+    std::uint64_t revision = 0;
 } // namespace
 
 void Log::Initialize(const std::filesystem::path& outputPath)
@@ -30,6 +31,7 @@ void Log::Write(const std::string& message)
     const std::string line = std::string(stamp) + "  " + message;
     std::lock_guard<std::mutex> lock(mutex);
     lines.push_back(line);
+    ++revision;
     if (lines.size() > 250)
         lines.pop_front();
     if (!path.empty())
@@ -40,8 +42,12 @@ void Log::Write(const std::string& message)
     }
 }
 
-std::vector<std::string> Log::Recent()
+bool Log::UpdateRecent(std::uint64_t& knownRevision, std::vector<std::string>& output)
 {
     std::lock_guard<std::mutex> lock(mutex);
-    return {lines.begin(), lines.end()};
+    if (knownRevision == revision)
+        return false;
+    output.assign(lines.begin(), lines.end());
+    knownRevision = revision;
+    return true;
 }

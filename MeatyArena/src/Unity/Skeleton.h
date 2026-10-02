@@ -4,6 +4,7 @@
 #include "Bones.h"
 #include "Types.h"
 
+#include <chrono>
 #include <cstdint>
 #include <array>
 #include <unordered_map>
@@ -80,6 +81,9 @@ namespace Unity
             liveVertices_.clear();
             liveReadEntries_.clear();
             prepared_ = false;
+            nextArrayRefreshAt_ = {};
+            nextGroupRefreshAt_ = {};
+            nextBuildAttemptAt_ = {};
         }
 
     private:
@@ -95,9 +99,11 @@ namespace Unity
             std::uint64_t verticesAddress = 0;
             std::uint64_t indicesAddress = 0;
             std::int32_t maxIndex = -1;
+            std::size_t representativeBone = 0;
             std::vector<std::int32_t> parents;
         };
         bool BuildCache();
+        bool RefreshCache();
         const MemoryClient& memory_;
         std::uint64_t array_ = 0;
         std::uint8_t stage_ = 0;
@@ -109,5 +115,8 @@ namespace Unity
         std::vector<std::vector<TrsX>> liveVertices_;
         std::vector<std::size_t> liveReadEntries_;
         bool prepared_ = false;
+        std::chrono::steady_clock::time_point nextArrayRefreshAt_{};
+        std::chrono::steady_clock::time_point nextGroupRefreshAt_{};
+        std::chrono::steady_clock::time_point nextBuildAttemptAt_{};
     };
 }

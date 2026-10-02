@@ -37,24 +37,19 @@ private:
     {
         PlayerSnapshot snapshot;
         std::uint64_t positionAddress = 0;
-        std::uint64_t lookTransformAddress = 0;
-        std::uint64_t playerBodyAddress = 0;
         std::uint64_t transformVerticesAddress = 0;
         std::uint64_t transformIndicesAddress = 0;
         std::int32_t transformIndex = -1;
         std::uint64_t rotationAddress = 0;
         Unity::Vector3 position{};
         Unity::Vector2 rotation{};
-        int missingTicks = 0;
-        int positionFailures = 0;
         bool established = false;
         bool usingBonePosition = false;
         bool local = false;
+        bool classificationReady = false;
+        std::chrono::steady_clock::time_point missingSince{};
         std::uint64_t nextTeamTick = 0;
         std::unique_ptr<Unity::Skeleton> skeleton;
-        int skeletonFailures = 0;
-        std::chrono::steady_clock::time_point lastPositionChangeAt{};
-        std::array<std::chrono::steady_clock::time_point, Unity::SkeletonBones.size()> boneUpdatedAt{};
     };
 
     bool ResolveWorld(std::string& error);
@@ -68,8 +63,9 @@ private:
     std::uint64_t ownerClass_ = 0;
     std::uint64_t localPlayer_ = 0;
     std::uint32_t typeIndex_ = 0;
-    int emptyTicks_ = 0;
     std::uint64_t sampleTick_ = 0;
+    std::uint32_t lastRegisteredPlayerCount_ = 0;
+    std::chrono::steady_clock::time_point lastActivePlayerListAt_{};
     std::atomic<std::uint64_t> publishedWorld_{0};
     std::atomic<std::uint64_t> publishedLocalPlayer_{0};
     std::atomic_bool inRaid_{false};

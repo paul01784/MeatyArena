@@ -36,3 +36,26 @@ struct PlayerSnapshot
     bool isAI = false;
     bool active = false;
 };
+
+namespace PlayerLabels
+{
+    inline std::string DisplayName(const PlayerSnapshot& player)
+    {
+        if (!player.isAI)
+            return player.name;
+
+        bool readable = false;
+        for (const char character : player.name)
+        {
+            if (character != '?' && character != ' ' && character != '\t')
+            {
+                readable = true;
+                break;
+            }
+        }
+        if (!readable || player.name == "Player")
+            return "Cleanup Crew";
+
+        return player.name + " [CLEANUP CREW]";
+    }
+} // namespace PlayerLabels
